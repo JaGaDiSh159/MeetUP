@@ -1,0 +1,2 @@
+export const BACKEND_URL=your_backend_url
+export const GOOGLE_CLIENT_ID=4068692044-usiuhg8kf1mq4htulpgj0s2ag9tafijn.apps.googleusercontent.com
