@@ -364,8 +364,8 @@ io.on("connection", (socket) => {
 
         const consumer = await transport.consume({
           producerId: payload.producerId,
-          rtpCapabilities: payload.rtpCapabilities,
-          paused: true,
+          rtpCapabilities: payload.rtpCapabilities
+          // paused: true,
         });
 
         await consumer.resume();
