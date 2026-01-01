@@ -6,12 +6,14 @@ export const mediaCodecs: mediasoupTypes.RtpCodecCapability[] = [
         mimeType: "audio/opus",
         clockRate: 48000,
         channels: 2,
+        preferredPayloadType: 111
     },
     {
         kind: "video",
         mimeType: "video/VP8",
         clockRate: 90000,
         parameters: {},
+        preferredPayloadType: 96
     },
 ]
 
