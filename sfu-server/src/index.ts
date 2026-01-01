@@ -16,7 +16,13 @@ import authRoutes from "./routes/authGoogle"
 const app = express();
 
 const httpServer = createServer(app);
-const io = new Server(httpServer, { cors: { origin: "*" } });
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
+  },
+});
+
 // const PORT = 5080;
 
 const PORT = Number(process.env.PORT) || 5080;
