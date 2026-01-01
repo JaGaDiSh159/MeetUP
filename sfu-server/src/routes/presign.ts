@@ -17,10 +17,10 @@ router.get('/', async (req: Request, res: Response) => {
 
 
     const command = new PutObjectCommand({
-        Bucket: BUCKET,
-        Key: `${fileName}`,
-        ContentType: contentType as string
+    Bucket: BUCKET,
+    Key: `${fileName}`
     });
+
 
     const url = await getSignedUrl(s3, command, { expiresIn: 600 });
     res.json({ url });
