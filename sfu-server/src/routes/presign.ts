@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { s3 } from '../lib/s3Client';
 import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+const BUCKET = process.env.AWS_S3_BUCKET!;
 
 const router = express.Router();
 
@@ -16,7 +17,7 @@ router.get('/', async (req: Request, res: Response) => {
 
 
     const command = new PutObjectCommand({
-        Bucket: 'meetup.wt',
+        Bucket: BUCKET,
         Key: `${fileName}`,
         ContentType: contentType as string
     });
@@ -35,7 +36,7 @@ router.get('/videos', async (req: Request, res: Response) => {
 
     try {
         const command = new ListObjectsV2Command({
-            Bucket: "meetup.wt",
+            Bucket: BUCKET,
             Prefix: `recordings/${email}/`,
         });
 
@@ -50,7 +51,7 @@ router.get('/videos', async (req: Request, res: Response) => {
         const videoUrls = await Promise.all(
             files.map(async (item) => {
                 const getCommand = new GetObjectCommand({
-                    Bucket: "meetup.wt",
+                    Bucket: BUCKET,
                     Key: item.Key,
                     ResponseContentDisposition: 'attachment; filename="video.mp4"',
                 });
