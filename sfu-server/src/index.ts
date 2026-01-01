@@ -17,7 +17,10 @@ const app = express();
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
-const PORT = 5080;
+// const PORT = 5080;
+
+const PORT = Number(process.env.PORT) || 5080;
+
 
 app.use(cors({
   origin: process.env.FRONTEND_URL,
@@ -428,7 +431,7 @@ io.on("connection", (socket) => {
   });
 });
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`SFU signaling server running on port ${PORT}`);
 });
 
