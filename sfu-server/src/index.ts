@@ -3,7 +3,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import dotenv from "dotenv";
 import { types as mediasoupTypes } from "mediasoup";
-dotenv.config();
+// dotenv.config();
 import { GetRoom } from "./signaling/rooms";
 import { createWebRtcTransport } from "./signaling/transports";
 import presignRouter from './routes/presign';
