@@ -145,6 +145,10 @@ export default function Room() {
                 audio: true,
             });
 
+            stream.getVideoTracks()[0].onended = () => {
+                console.log("VIDEO TRACK ENDED ❌");
+            };
+
             if (localVideoRef.current) {
                 localVideoRef.current.srcObject = stream;
             }
