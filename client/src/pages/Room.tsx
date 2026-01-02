@@ -168,12 +168,20 @@ export default function Room() {
                 return;
             }
 
-            await new Promise<void>((resolve) => {
-                sendTransport.on("connect", ({ dtlsParameters }, callback) => {
+            // await new Promise<void>((resolve) => {
+            //     sendTransport.on("connect", ({ dtlsParameters }, callback) => {
+            //         callback();
+            //         resolve();
+            //     });
+            // });
+
+                        await new Promise<void>((resolve) => {
+                sendTransport.on("connect", (_params, callback) => {
                     callback();
                     resolve();
                 });
             });
+
 
             const videoTrack = stream.getVideoTracks()[0];
             if (videoTrack) {
