@@ -153,14 +153,35 @@ export default function Room() {
                 localVideoRef.current.srcObject = stream;
             }
 
-            const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
+            // const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
           
 
-            const videoTrack = stream.getVideoTracks()[0];
-            if (sendTransport && videoTrack) {
-                const produced = await sendTransport.produce({ track: videoTrack });
-                if (produced) setProducer(produced);
+            // const videoTrack = stream.getVideoTracks()[0];
+            // if (sendTransport && videoTrack) {
+            //     const produced = await sendTransport.produce({ track: videoTrack });
+            //     if (produced) setProducer(produced);
+            // }
+            const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
+
+            if (!sendTransport) {
+                console.error("Send transport not created");
+                return;
             }
+
+            await new Promise<void>((resolve) => {
+                sendTransport.on("connect", ({ dtlsParameters }, callback) => {
+                    callback();
+                    resolve();
+                });
+            });
+
+            const videoTrack = stream.getVideoTracks()[0];
+            if (videoTrack) {
+                const produced = await sendTransport.produce({ track: videoTrack });
+                setProducer(produced);
+            }
+
+
 
             const recvTransport = await createRecTransport(roomId, "recv", joinedDevice);
             if (recvTransport) setConsumerTransport(recvTransport);
@@ -175,7 +196,7 @@ export default function Room() {
         }
 
         setup();
-    }, [roomId, joinRoom, createSendTransport, createRecTransport, producer]);
+    }, [roomId, joinRoom, createSendTransport, createRecTransport]);
 
 
     const handleLeave = () => {
