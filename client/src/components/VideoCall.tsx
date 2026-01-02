@@ -439,15 +439,18 @@ const VideoCall: React.FC<VideoCallProps> = ({
                                         </div>
                                     </div>
                                 ) : (
-                                    <video
-                                        autoPlay
-                                        playsInline
-                                        muted={mainViewParticipant.isLocal}
-                                        className="w-full h-full object-contain"
-                                        ref={(el) => mainViewParticipant.isLocal
-                                            ? setVideoRef(el)
-                                            : setVideoSrcObject(el, mainViewParticipant.stream)}
-                                    />
+                                        <video
+                                            autoPlay
+                                            playsInline
+                                            muted={mainViewParticipant.isLocal}
+                                            className={`w-full h-full object-contain ${
+                                                mainViewParticipant.isLocal ? "mirror-video" : ""
+                                            }`}
+                                            ref={(el) => mainViewParticipant.isLocal
+                                                ? setVideoRef(el)
+                                                : setVideoSrcObject(el, mainViewParticipant.stream)}
+                                        />
+    
                                 )}
                                 <div className="absolute bottom-4 left-4 bg-black/70 px-3 py-1.5 rounded text-sm flex items-center gap-2">
                                     {mainViewParticipant.name}

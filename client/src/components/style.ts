@@ -41,6 +41,11 @@ export const styles = `
   transition-duration: 200ms;
 }
 
+.mirror-video {
+    transform: scaleX(-1);
+}
+
+
 .transition-colors {
   transition-property: background-color, border-color, color, fill, stroke;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
