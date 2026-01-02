@@ -18,7 +18,7 @@ const Header = () => {
 
     const handleLogout = () => {
         localStorage.removeItem("user");
-        toast.error("Logot Successfull!")
+        toast.error("Logout Successfull!")
         nevigate("/login")
     }
 
