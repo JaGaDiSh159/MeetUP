@@ -139,160 +139,98 @@ export default function Room() {
         initialized.current = true;
 
         async function setup() {
+  console.log("🚀 setup() STARTED");
 
-            if (!roomId) {
-                {
-                    console.log("room not found");
-                    return
-                }
-            }
-            
-            const joinedDevice = await joinRoom(roomId);
-            console.log("✅ joinRoom() DONE", joinedDevice);
-            if (!joinedDevice) {
-                console.error("Device not found");
-                return;
-            }
-            setDevice(joinedDevice);
+  if (!roomId) {
+    console.log("❌ roomId missing");
+    return;
+  }
 
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true,
-            });
-            console.log("📷 getUserMedia() DONE", stream);
+  // 1️⃣ Join room
+  const joinedDevice = await joinRoom(roomId);
+  console.log("✅ joinRoom() DONE", joinedDevice);
 
+  if (!joinedDevice) {
+    console.error("❌ Device not found");
+    return;
+  }
+  setDevice(joinedDevice);
 
-            stream.getVideoTracks()[0].onended = () => {
-                console.log("VIDEO TRACK ENDED ❌");
-            };
+  // 2️⃣ Get media
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: true,
+    audio: true,
+  });
+  console.log("📷 getUserMedia() DONE", stream);
 
-            if (localVideoRef.current) {
-                localVideoRef.current.srcObject = stream;
-            }
+  if (localVideoRef.current) {
+    localVideoRef.current.srcObject = stream;
+  }
 
-            // const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
-          
+  // 3️⃣ Create send transport
+  const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
 
-            // const videoTrack = stream.getVideoTracks()[0];
-            // if (sendTransport && videoTrack) {
-            //     const produced = await sendTransport.produce({ track: videoTrack });
-            //     if (produced) setProducer(produced);
-            // }
-            const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
+  if (!sendTransport) {
+    console.error("❌ Send transport not created");
+    return;
+  }
 
-            if (!sendTransport) {
-                console.error("Send transport not created");
-                return;
-            }
+  console.log("🚚 sendTransport CREATED", sendTransport.id);
 
-            sendTransport.on(
-                "produce",
-                async (
-                    { kind, rtpParameters },
-                    callback,
-                    errback
-                ) => {
-                    socket.emit(
-                    "produce",
-                    {
-                        roomId,
-                        transportId: sendTransport.id,
-                        kind,
-                        rtpParameters,
-                    },
-                    (response: { id?: string; error?: string }) => {
-                        const { id, error } = response;
+  // 4️⃣ Attach PRODUCE handler (ONLY ONCE)
+  sendTransport.on(
+    "produce",
+    async ({ kind, rtpParameters }, callback, errback) => {
+      socket.emit(
+        "produce",
+        {
+          roomId,
+          transportId: sendTransport.id,
+          kind,
+          rtpParameters,
+        },
+        (response: { id?: string; error?: string }) => {
+          const { id, error } = response;
 
-                        if (error || !id) {
-                        errback(new Error(error ?? "Producer id missing"));
-                        } else {
-                        callback({ id });
-                        }
-                    }
-                );
-            }
-            );
-
-            
-
-            console.log("🚚 sendTransport CREATED", sendTransport?.id);
-
-            
-
-
-            // await new Promise<void>((resolve) => {
-            //     sendTransport.on("connect", ({ dtlsParameters }, callback) => {
-            //         callback();
-            //         resolve();
-            //     });
-            // });
-
-                        await new Promise<void>((resolve) => {
-                sendTransport.on("connect", (_params, callback) => {
-                    callback();
-                    resolve();
-                });
-            });
-
-
-            sendTransport.on(
-            "produce",
-            async (
-                { kind, rtpParameters }: {
-                kind: mediasoupTypes.MediaKind;
-                rtpParameters: mediasoupTypes.RtpParameters;
-                },
-                callback: ({ id }: { id: string }) => void,
-                errback: (error: Error) => void
-            ) => {
-                socket.emit(
-                "produce",
-                {
-                    roomId,
-                    transportId: sendTransport.id,
-                    kind,
-                    rtpParameters,
-                },
-                (response: { id?: string; error?: string }) => {
-                    if (response.error) {
-                    errback(new Error(response.error));
-                    } else if (response.id) {
-                    callback({ id: response.id });
-                    }
-                }
-                );
-            }
-            );
-
-
-            // ✅ EXISTING CODE — KEEP THIS
-            const videoTrack = stream.getVideoTracks()[0];
-
-            if (videoTrack) {
-            console.log("🎥 ABOUT TO CALL sendTransport.produce()", videoTrack);
-
-            const produced = await sendTransport.produce({ track: videoTrack });
-
-            console.log("🎥 sendTransport.produce() RESOLVED", produced);
-
-            setProducer(produced);
-            } else {
-            console.log("❌ NO VIDEO TRACK FOUND");
-            }
-
-
-
-            const recvTransport = await createRecTransport(roomId, "recv", joinedDevice);
-            if (recvTransport) setConsumerTransport(recvTransport);
-
-            // if (recvTransport) {
-            //     socket.emit("getProducers", roomId, ({ producerIds }: { producerIds: string[] }) => {
-            //         producerIds.forEach((id) => {
-            //             if (id !== producer?.id) consumeRef.current?.(id);
-            //         });
-            //     });
-            // }
+          if (error || !id) {
+            errback(new Error(error ?? "Producer id missing"));
+          } else {
+            callback({ id });
+          }
         }
+      );
+    }
+  );
+
+  // 5️⃣ Connect transport
+  await new Promise<void>((resolve) => {
+    sendTransport.on("connect", (_params, callback) => {
+      callback();
+      resolve();
+    });
+  });
+
+  // 6️⃣ Produce video
+  const videoTrack = stream.getVideoTracks()[0];
+
+  if (!videoTrack) {
+    console.log("❌ NO VIDEO TRACK FOUND");
+    return;
+  }
+
+  console.log("🎥 ABOUT TO CALL sendTransport.produce()");
+  const produced = await sendTransport.produce({ track: videoTrack });
+  console.log("🎥 sendTransport.produce() RESOLVED", produced);
+
+  setProducer(produced);
+
+  // 7️⃣ Create recv transport
+  const recvTransport = await createRecTransport(roomId, "recv", joinedDevice);
+  if (recvTransport) {
+    setConsumerTransport(recvTransport);
+  }
+}
+
 
         setup();
     }, [roomId, joinRoom, createSendTransport, createRecTransport]);
