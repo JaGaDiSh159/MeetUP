@@ -261,6 +261,8 @@ io.on("connection", (socket) => {
           rtpParameters: payload.rtpParameters,
         });
 
+        console.log("🎬 PRODUCER CREATED:", producer.id, "by socket:", socket.id);
+
         peer.producers.push({ producer, transportId: transport.id });
 
         let broadcastedProducers = roomBroadcastedProducers.get(payload.roomId);
@@ -280,7 +282,7 @@ io.on("connection", (socket) => {
               kind: producer.kind,
             });
 
-            console.log("emitted for client  ", socketId);
+            console.log("📢 EMITTING newProducer to socket:", socketId);
           }
         }
 
