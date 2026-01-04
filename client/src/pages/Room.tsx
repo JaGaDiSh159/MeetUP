@@ -13,7 +13,7 @@ import type { ConsumeResponse } from "../types";
 
 export default function Room() {
 
-    console.log("🚀 setup() STARTED");
+    
 
 
     const { roomId } = useParams<{ roomId: string }>();
