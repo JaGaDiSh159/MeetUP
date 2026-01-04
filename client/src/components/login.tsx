@@ -1,13 +1,15 @@
 import { GoogleLogin } from '@react-oauth/google';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+
 import axios from "axios";
 import { BACKEND_URL } from '../config';
 
 function Login() {
-    const location = useLocation();
-    const redirectTo = location.state?.from || "/";
+    const [searchParams] = useSearchParams();
+    const redirectTo = searchParams.get("redirect") || "/";
+
 
     const nevigate = useNavigate();
     const [isLoading, setIsLoading] = useState(false);

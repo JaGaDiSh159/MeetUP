@@ -7,9 +7,8 @@ function PrivateRoute() {
   if (!user) {
     return (
       <Navigate
-        to="/login"
+        to={`/login?redirect=${encodeURIComponent(location.pathname)}`}
         replace
-        state={{ from: location.pathname }}
       />
     );
   }
