@@ -44,6 +44,14 @@ export default function Room() {
         const consumerTransport = consumerTransportRef.current;
         const device = deviceRef.current;
 
+        console.log(
+            "🎥 consume() called",
+            "producerId =", producerId,
+            "consumerTransport =", consumerTransport?.id,
+            "device =", !!device
+            );
+
+
         if (!consumerTransport || !device) {
             console.error("Consumer transport or device missing");
             return;
@@ -53,6 +61,8 @@ export default function Room() {
             console.log(`Already consuming producer ${producerId}`);
             return;
         }
+
+        
 
         socket.emit(
             "consume",
@@ -194,17 +204,34 @@ export default function Room() {
             const recvTransport = await createRecTransport(roomId, "recv", joinedDevice);
             if (recvTransport) setConsumerTransport(recvTransport);
 
-            if (recvTransport) {
-                socket.emit("getProducers", roomId, ({ producerIds }: { producerIds: string[] }) => {
-                    producerIds.forEach((id) => {
-                        if (id !== producer?.id) consumeRef.current?.(id);
-                    });
-                });
-            }
+            // if (recvTransport) {
+            //     socket.emit("getProducers", roomId, ({ producerIds }: { producerIds: string[] }) => {
+            //         producerIds.forEach((id) => {
+            //             if (id !== producer?.id) consumeRef.current?.(id);
+            //         });
+            //     });
+            // }
         }
 
         setup();
     }, [roomId, joinRoom, createSendTransport, createRecTransport]);
+
+    useEffect(() => {
+    if (!consumerTransport || !device || !roomId) return;
+
+    console.log("✅ Consumer transport ready, fetching producers");
+
+    socket.emit(
+        "getProducers",
+        roomId,
+        ({ producerIds }: { producerIds: string[] }) => {
+            producerIds.forEach((producerId) => {
+                consumeRef.current?.(producerId);
+                    });
+                }
+            );
+        }, [consumerTransport, device, roomId]);
+
 
 
     const handleLeave = () => {
