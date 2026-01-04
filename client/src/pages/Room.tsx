@@ -180,13 +180,45 @@ export default function Room() {
             // }
             const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
 
-            console.log("🚚 sendTransport CREATED", sendTransport?.id);
-
-
             if (!sendTransport) {
                 console.error("Send transport not created");
                 return;
             }
+
+            sendTransport.on(
+                "produce",
+                async (
+                    { kind, rtpParameters },
+                    callback,
+                    errback
+                ) => {
+                    socket.emit(
+                    "produce",
+                    {
+                        roomId,
+                        transportId: sendTransport.id,
+                        kind,
+                        rtpParameters,
+                    },
+                    (response: { id?: string; error?: string }) => {
+                        const { id, error } = response;
+
+                        if (error || !id) {
+                        errback(new Error(error ?? "Producer id missing"));
+                        } else {
+                        callback({ id });
+                        }
+                    }
+                );
+            }
+            );
+
+            
+
+            console.log("🚚 sendTransport CREATED", sendTransport?.id);
+
+            
+
 
             // await new Promise<void>((resolve) => {
             //     sendTransport.on("connect", ({ dtlsParameters }, callback) => {
