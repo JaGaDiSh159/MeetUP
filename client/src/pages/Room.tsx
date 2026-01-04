@@ -193,12 +193,42 @@ export default function Room() {
             });
 
 
+            sendTransport.on(
+            "produce",
+            async (
+                { kind, rtpParameters }: {
+                kind: mediasoupTypes.MediaKind;
+                rtpParameters: mediasoupTypes.RtpParameters;
+                },
+                callback: ({ id }: { id: string }) => void,
+                errback: (error: Error) => void
+            ) => {
+                socket.emit(
+                "produce",
+                {
+                    roomId,
+                    transportId: sendTransport.id,
+                    kind,
+                    rtpParameters,
+                },
+                (response: { id?: string; error?: string }) => {
+                    if (response.error) {
+                    errback(new Error(response.error));
+                    } else if (response.id) {
+                    callback({ id: response.id });
+                    }
+                }
+                );
+            }
+            );
+
+
+            // ✅ EXISTING CODE — KEEP THIS
             const videoTrack = stream.getVideoTracks()[0];
             if (videoTrack) {
-                const produced = await sendTransport.produce({ track: videoTrack });
-                setProducer(produced);
+            const produced = await sendTransport.produce({ track: videoTrack });
+            setProducer(produced);
             }
-
 
 
             const recvTransport = await createRecTransport(roomId, "recv", joinedDevice);
