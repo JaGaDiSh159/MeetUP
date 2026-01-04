@@ -225,10 +225,19 @@ export default function Room() {
 
             // ✅ EXISTING CODE — KEEP THIS
             const videoTrack = stream.getVideoTracks()[0];
+
             if (videoTrack) {
+            console.log("🎥 ABOUT TO CALL sendTransport.produce()", videoTrack);
+
             const produced = await sendTransport.produce({ track: videoTrack });
+
+            console.log("🎥 sendTransport.produce() RESOLVED", produced);
+
             setProducer(produced);
+            } else {
+            console.log("❌ NO VIDEO TRACK FOUND");
             }
+
 
 
             const recvTransport = await createRecTransport(roomId, "recv", joinedDevice);
