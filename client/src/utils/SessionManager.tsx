@@ -13,7 +13,7 @@ function SessionManager() {
                 localStorage.setItem('user', JSON.stringify(res.data));
             } catch (err) {
                 localStorage.removeItem('user');
-                navigate('/login');
+                // navigate('/login');
             }
         };
 
