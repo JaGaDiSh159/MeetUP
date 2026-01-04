@@ -13,6 +13,9 @@ import type { ConsumeResponse } from "../types";
 
 export default function Room() {
 
+    console.log("🚀 setup() STARTED");
+
+
     const { roomId } = useParams<{ roomId: string }>();
 
     const user = localStorage.getItem("user")
@@ -143,7 +146,9 @@ export default function Room() {
                     return
                 }
             }
+            
             const joinedDevice = await joinRoom(roomId);
+            console.log("✅ joinRoom() DONE", joinedDevice);
             if (!joinedDevice) {
                 console.error("Device not found");
                 return;
@@ -154,6 +159,8 @@ export default function Room() {
                 video: true,
                 audio: true,
             });
+            console.log("📷 getUserMedia() DONE", stream);
+
 
             stream.getVideoTracks()[0].onended = () => {
                 console.log("VIDEO TRACK ENDED ❌");
@@ -172,6 +179,9 @@ export default function Room() {
             //     if (produced) setProducer(produced);
             // }
             const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
+
+            console.log("🚚 sendTransport CREATED", sendTransport?.id);
+
 
             if (!sendTransport) {
                 console.error("Send transport not created");
