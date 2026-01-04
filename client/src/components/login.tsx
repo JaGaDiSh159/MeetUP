@@ -1,11 +1,14 @@
 import { GoogleLogin } from '@react-oauth/google';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { BACKEND_URL } from '../config';
 
 function Login() {
+    const location = useLocation();
+    const redirectTo = location.state?.from || "/";
+
     const nevigate = useNavigate();
     const [isLoading, setIsLoading] = useState(false);
 
@@ -25,7 +28,7 @@ function Login() {
 
             setTimeout(() => {
                 setIsLoading(false);
-                nevigate("/");
+                nevigate(redirectTo, { replace: true });
             }, 1000);
 
 

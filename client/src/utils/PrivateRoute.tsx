@@ -1,9 +1,20 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 function PrivateRoute() {
-  const user = localStorage.getItem('user');
+  const user = localStorage.getItem("user");
+  const location = useLocation();
 
-  return user ? <Outlet /> : <Navigate to="/login" />;
+  if (!user) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location.pathname }}
+      />
+    );
+  }
+
+  return <Outlet />;
 }
 
 export default PrivateRoute;
