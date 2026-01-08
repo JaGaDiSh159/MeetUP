@@ -153,119 +153,153 @@ setRemoteStreams((prev) =>
         }
         initialized.current = true;
 
+// 🔒 GLOBAL GUARD — VERY IMPORTANT
+let setupInProgress = false;
+
 async function setup() {
-  console.log("🚀 setup() STARTED");
-
-  if (!roomId) return;
-
-  // 1️⃣ Join room
-  const joinedDevice = await joinRoom(roomId);
-  if (!joinedDevice) return;
-  setDevice(joinedDevice);
-
-  // 2️⃣ Get media
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: true,
-    audio: true,
-  });
-
-  if (localVideoRef.current) {
-    localVideoRef.current.srcObject = stream;
-  }
-
-  // 3️⃣ CREATE RECV TRANSPORT FIRST ✅
-  const recvTransport = await createRecTransport(roomId, "recv", joinedDevice);
-  if (!recvTransport) {
-    console.error("❌ Recv transport not created");
+  if (setupInProgress) {
+    console.warn("⚠️ setup() already in progress, skipping");
     return;
   }
-  setConsumerTransport(recvTransport);
-  console.log("📥 recvTransport CREATED", recvTransport.id);
 
-// 4️⃣ CREATE SEND TRANSPORT
-const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
+  setupInProgress = true;
+  console.log("🚀 setup() STARTED");
 
-if (!sendTransport) {
-  console.error("❌ Send transport not created");
-  return;
-}
+  try {
+    if (!roomId) {
+      console.warn("⚠️ No roomId, aborting setup");
+      return;
+    }
 
-console.log("📤 sendTransport CREATED", sendTransport.id);
+    // 1️⃣ JOIN ROOM & LOAD DEVICE
+    const joinedDevice = await joinRoom(roomId);
+    if (!joinedDevice) {
+      console.error("❌ Failed to join room");
+      return;
+    }
+    setDevice(joinedDevice);
 
-// ✅ STEP 5 — CONNECT SEND TRANSPORT (CRITICAL FIX)
-sendTransport.on(
-  "connect",
-  ({ dtlsParameters }, callback, errback) => {
-    console.log("🔌 sendTransport connect event");
+    // 2️⃣ GET USER MEDIA
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true,
+    });
 
-    socket.emit(
-      "connectTransport",
-      {
-        roomId,
-        transportId: sendTransport.id,
-        direction: "send",
-        dtlsParameters,
-      },
-      (response: { error?: string }) => {
-        if (response?.error) {
-          console.error("❌ sendTransport connect failed", response.error);
-          errback(new Error(response.error));
-        } else {
-          console.log("✅ sendTransport connected");
-          callback();
-        }
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
+    }
+
+    // 3️⃣ CREATE RECV TRANSPORT FIRST
+    const recvTransport = await createRecTransport(
+      roomId,
+      "recv",
+      joinedDevice
+    );
+
+    if (!recvTransport) {
+      console.error("❌ recvTransport creation failed");
+      return;
+    }
+
+    setConsumerTransport(recvTransport);
+    console.log("📥 recvTransport CREATED", recvTransport.id);
+
+    // 4️⃣ CREATE SEND TRANSPORT
+    const sendTransport = await createSendTransport(
+      roomId,
+      "send",
+      joinedDevice
+    );
+
+    if (!sendTransport) {
+      console.error("❌ sendTransport creation failed");
+      return;
+    }
+
+    console.log("📤 sendTransport CREATED", sendTransport.id);
+
+    // 5️⃣ CONNECT SEND TRANSPORT (DTLS)
+    sendTransport.on(
+      "connect",
+      ({ dtlsParameters }, callback, errback) => {
+        console.log("🔌 sendTransport connect event");
+
+        socket.emit(
+          "connectTransport",
+          {
+            roomId,
+            transportId: sendTransport.id,
+            direction: "send",
+            dtlsParameters,
+          },
+          (res: { error?: string }) => {
+            if (res?.error) {
+              console.error("❌ sendTransport connect failed", res.error);
+              errback(new Error(res.error));
+            } else {
+              console.log("✅ sendTransport connected");
+              callback(); // 🔴 MUST be called ONCE
+            }
+          }
+        );
       }
     );
-  }
-);
 
-// ✅ STEP 6 — PRODUCE HANDLER
-sendTransport.on(
-  "produce",
-  async ({ kind, rtpParameters }, callback, errback) => {
-    console.log("🎬 produce event fired:", kind);
-
-    socket.emit(
+    // 6️⃣ PRODUCE HANDLER
+    sendTransport.on(
       "produce",
-      {
-        roomId,
-        transportId: sendTransport.id,
-        kind,
-        rtpParameters,
-      },
-      ({ id, error }: { id?: string; error?: string }) => {
-        if (error || !id) {
-          console.error("❌ produce failed", error);
-          errback(new Error(error ?? "Produce failed"));
-        } else {
-          console.log("✅ producerId received:", id);
-          callback({ id });
-        }
+      ({ kind, rtpParameters }, callback, errback) => {
+        console.log("🎬 produce event fired:", kind);
+
+        socket.emit(
+          "produce",
+          {
+            roomId,
+            transportId: sendTransport.id,
+            kind,
+            rtpParameters,
+          },
+          ({ id, error }: { id?: string; error?: string }) => {
+            if (error || !id) {
+              console.error("❌ produce failed", error);
+              errback(new Error(error ?? "Produce failed"));
+            } else {
+              console.log("✅ producerId received:", id);
+              callback({ id }); // 🔴 EXACTLY ONCE
+            }
+          }
+        );
       }
     );
+
+    // 7️⃣ PRODUCE VIDEO
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) {
+      console.error("❌ No video track found");
+      return;
+    }
+
+    const videoProducer = await sendTransport.produce({
+      track: videoTrack,
+    });
+
+    setProducer(videoProducer);
+    console.log("🎥 Video produced:", videoProducer.id);
+
+    // 8️⃣ PRODUCE AUDIO (OPTIONAL)
+    const audioTrack = stream.getAudioTracks()[0];
+    if (audioTrack) {
+      await sendTransport.produce({ track: audioTrack });
+      console.log("🎤 Audio produced");
+    }
+
+    console.log("✅ setup() COMPLETED SUCCESSFULLY");
+  } catch (err) {
+    console.error("❌ setup() FAILED", err);
+    setupInProgress = false; // allow retry on failure
   }
-);
-
-// ✅ STEP 7 — PRODUCE VIDEO
-const videoTrack = stream.getVideoTracks()[0];
-if (!videoTrack) {
-  console.error("❌ No video track");
-  return;
 }
 
-const videoProducer = await sendTransport.produce({ track: videoTrack });
-setProducer(videoProducer);
-console.log("🎥 Video produced:", videoProducer.id);
-
-// ✅ STEP 8 — PRODUCE AUDIO
-const audioTrack = stream.getAudioTracks()[0];
-if (audioTrack) {
-  await sendTransport.produce({ track: audioTrack });
-  console.log("🎤 Audio produced");
-}
-
-
-}
 
 
 
