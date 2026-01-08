@@ -25,7 +25,7 @@ export default function Room() {
 
     const navigate = useNavigate();
 
-    const [producer, setProducer] = useState<mediasoupTypes.Producer | null>(null);
+    // const [producer, setProducer] = useState<mediasoupTypes.Producer | null>(null);
     const [consumerTransport, setConsumerTransport] = useState<mediasoupTypes.Transport | null>(null);
     const [device, setDevice] = useState<mediasoupTypes.Device | null>(null);
 
@@ -281,7 +281,7 @@ useEffect(() => {
   pendingProducersRef.current.clear();
 
   socket.disconnect();
-  producer?.close();
+  // producer?.close();
 
   navigate("/");
 };
