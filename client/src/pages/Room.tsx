@@ -43,6 +43,10 @@ export default function Room() {
 
     const consumeRef = useRef<(producerId: string) => void>(null);
 
+    const pendingProducersRef = useRef<Set<string>>(new Set());
+    const consumedProducersRef = useRef<Set<string>>(new Set());
+
+
     const consume = useCallback(async (producerId: string) => {
         const consumerTransport = consumerTransportRef.current;
         const device = deviceRef.current;
@@ -56,14 +60,19 @@ export default function Room() {
 
 
         if (!consumerTransport || !device) {
-            console.error("Consumer transport or device missing");
-            return;
-        }
+    console.log("⏳ consume delayed, buffering producer:", producerId);
+    pendingProducersRef.current.add(producerId);
+    return;
+}
 
-        if (remoteStreams.find((s) => s.producerId === producerId)) {
-            console.log(`Already consuming producer ${producerId}`);
-            return;
-        }
+
+        if (consumedProducersRef.current.has(producerId)) {
+  console.log("⛔ Already consuming producer:", producerId);
+  return;
+}
+
+consumedProducersRef.current.add(producerId);
+
 
         
 
@@ -112,6 +121,12 @@ export default function Room() {
 
         const handleProducerLeft = ({ producerId }: { producerId: string }) => {
             console.log("Producer left:", producerId);
+            consumedProducersRef.current.delete(producerId);
+
+setRemoteStreams((prev) =>
+  prev.filter(({ producerId: id }) => id !== producerId)
+);
+
             setRemoteStreams((prev) => prev.filter(({ producerId: id }) => id !== producerId));
         };
 
@@ -138,22 +153,14 @@ export default function Room() {
         }
         initialized.current = true;
 
-        async function setup() {
+async function setup() {
   console.log("🚀 setup() STARTED");
 
-  if (!roomId) {
-    console.log("❌ roomId missing");
-    return;
-  }
+  if (!roomId) return;
 
   // 1️⃣ Join room
   const joinedDevice = await joinRoom(roomId);
-  console.log("✅ joinRoom() DONE", joinedDevice);
-
-  if (!joinedDevice) {
-    console.error("❌ Device not found");
-    return;
-  }
+  if (!joinedDevice) return;
   setDevice(joinedDevice);
 
   // 2️⃣ Get media
@@ -161,23 +168,29 @@ export default function Room() {
     video: true,
     audio: true,
   });
-  console.log("📷 getUserMedia() DONE", stream);
 
   if (localVideoRef.current) {
     localVideoRef.current.srcObject = stream;
   }
 
-  // 3️⃣ Create send transport
-  const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
+  // 3️⃣ CREATE RECV TRANSPORT FIRST ✅
+  const recvTransport = await createRecTransport(roomId, "recv", joinedDevice);
+  if (!recvTransport) {
+    console.error("❌ Recv transport not created");
+    return;
+  }
+  setConsumerTransport(recvTransport);
+  console.log("📥 recvTransport CREATED", recvTransport.id);
 
+  // 4️⃣ CREATE SEND TRANSPORT
+  const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
   if (!sendTransport) {
     console.error("❌ Send transport not created");
     return;
   }
+  console.log("📤 sendTransport CREATED", sendTransport.id);
 
-  console.log("🚚 sendTransport CREATED", sendTransport.id);
-
-  // 4️⃣ Attach PRODUCE handler (ONLY ONCE)
+  // 5️⃣ PRODUCE handler (ONCE)
   sendTransport.on(
     "produce",
     async ({ kind, rtpParameters }, callback, errback) => {
@@ -190,19 +203,20 @@ export default function Room() {
           rtpParameters,
         },
         (response: { id?: string; error?: string }) => {
-          const { id, error } = response;
+  const { id, error } = response;
 
-          if (error || !id) {
-            errback(new Error(error ?? "Producer id missing"));
-          } else {
-            callback({ id });
-          }
-        }
+  if (error || !id) {
+    errback(new Error(error ?? "Produce failed"));
+  } else {
+    callback({ id });
+  }
+}
+
       );
     }
   );
 
-  // 5️⃣ Connect transport
+  // 6️⃣ CONNECT send transport
   await new Promise<void>((resolve) => {
     sendTransport.on("connect", (_params, callback) => {
       callback();
@@ -210,54 +224,66 @@ export default function Room() {
     });
   });
 
-  // 6️⃣ Produce video
-  const videoTrack = stream.getVideoTracks()[0];
+  // 7️⃣ PRODUCE VIDEO
+  // 7️⃣ PRODUCE VIDEO
+const videoTrack = stream.getVideoTracks()[0];
+if (!videoTrack) return;
 
-  if (!videoTrack) {
-    console.log("❌ NO VIDEO TRACK FOUND");
-    return;
-  }
+const videoProducer = await sendTransport.produce({ track: videoTrack });
+setProducer(videoProducer);
+console.log("🎥 Video produced:", videoProducer.id);
 
-  console.log("🎥 ABOUT TO CALL sendTransport.produce()");
-  const produced = await sendTransport.produce({ track: videoTrack });
-  console.log("🎥 sendTransport.produce() RESOLVED", produced);
-
-  setProducer(produced);
-
-  // 7️⃣ Create recv transport
-  const recvTransport = await createRecTransport(roomId, "recv", joinedDevice);
-  if (recvTransport) {
-    setConsumerTransport(recvTransport);
-  }
+// 🎤 PRODUCE AUDIO
+const audioTrack = stream.getAudioTracks()[0];
+if (audioTrack) {
+  await sendTransport.produce({ track: audioTrack });
+  console.log("🎤 Audio produced");
 }
+
+}
+
 
 
         setup();
     }, [roomId, joinRoom, createSendTransport, createRecTransport]);
 
-    useEffect(() => {
-    if (!consumerTransport || !device || !roomId) return;
+useEffect(() => {
+  if (!consumerTransport || !device || !roomId) return;
 
-    console.log("✅ Consumer transport ready, fetching producers");
+  console.log("✅ Consumer transport ready, fetching producers");
 
-    socket.emit(
-        "getProducers",
-        roomId,
-        ({ producerIds }: { producerIds: string[] }) => {
-            producerIds.forEach((producerId) => {
-                consumeRef.current?.(producerId);
-                    });
-                }
-            );
-        }, [consumerTransport, device, roomId]);
+  // 1️⃣ Consume producers already in room
+  socket.emit(
+    "getProducers",
+    roomId,
+    ({ producerIds }: { producerIds: string[] }) => {
+      producerIds.forEach((producerId) => {
+        consumeRef.current?.(producerId);
+      });
+    }
+  );
+
+  // 2️⃣ Flush buffered producers (from early newProducer events)
+  pendingProducersRef.current.forEach((producerId) => {
+    console.log("🔁 Flushing buffered producer:", producerId);
+    consumeRef.current?.(producerId);
+  });
+
+  pendingProducersRef.current.clear();
+}, [consumerTransport, device, roomId]);
+
 
 
 
     const handleLeave = () => {
-        socket.disconnect();
-        producer?.close();
-        navigate("/");
-    };
+  consumedProducersRef.current.clear();
+  pendingProducersRef.current.clear();
+
+  socket.disconnect();
+  producer?.close();
+
+  navigate("/");
+};
 
 
     const handleToggleMic = (muted: boolean) => {

@@ -1,17 +1,33 @@
-import { getWorker } from './worker';
 import { types as mediasoupTypes } from "mediasoup";
-import { mediaCodecs } from '../config';
+import { getWorker } from "./worker";
+import { mediaCodecs } from "../config";
 
-const rooms = new Map<string, mediasoupTypes.Router>();
+export interface Room {
+  id: string;
+  router: mediasoupTypes.Router;
+  peers: Map<string, any>;
+  broadcastedProducers: Set<string>;
+}
 
-export const GetRoom = async (roomId: string): Promise<mediasoupTypes.Router> => {
+export const rooms = new Map<string, Room>();
 
-    if (rooms.has(roomId)) return rooms.get(roomId)!;
+export async function GetRoom(roomId: string): Promise<Room> {
+  let room = rooms.get(roomId);
 
+  if (!room) {
     const worker = await getWorker();
     const router = await worker.createRouter({ mediaCodecs });
-    rooms.set(roomId, router);
 
+    room = {
+      id: roomId,
+      router,
+      peers: new Map(),
+      broadcastedProducers: new Set(),
+    };
+
+    rooms.set(roomId, room);
     console.log(`Room created: ${roomId}`);
-    return router;
-};
+  }
+
+  return room;
+}
