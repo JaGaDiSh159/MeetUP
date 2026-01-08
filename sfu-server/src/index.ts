@@ -188,52 +188,68 @@ io.on("connection", (socket) => {
   );
 
   socket.on(
-    "connectTransport",
-    async (
-      payload: {
-        roomId: string;
-        transportId: string;
-        direction: "send" | "recv";
-        dtlsParameters: mediasoupTypes.DtlsParameters;
-      },
-      callback
-    ) => {
-      try {
-        const room = await GetRoom(payload.roomId);
-        const peerMap = room.peers;
+  "connectTransport",
+  async (
+    payload: {
+      roomId: string;
+      transportId: string;
+      direction: "send" | "recv";
+      dtlsParameters: mediasoupTypes.DtlsParameters;
+    },
+    callback: (response?: { error?: string }) => void
+  ) => {
 
-        if (!peerMap) {
-          return callback({ error: "Room not found" });
-        }
-
-        const peer = peerMap.get(socket.id);
-        if (!peer) {
-          return callback({ error: "Peer not found" });
-        }
-
-        let transport: mediasoupTypes.WebRtcTransport | undefined;
-
-if (payload.direction === "recv") {
-  transport = peer.consumerTransport.find(
-    (t: mediasoupTypes.WebRtcTransport) => t.id === payload.transportId
-  );
-} else {
-  transport = peer.producerTransport.find(
-    (t: mediasoupTypes.WebRtcTransport) => t.id === payload.transportId
-  );
-}
-
-if (!transport) {
-  return callback({ error: "Transport not found" });
-}
-
-await transport.connect({ dtlsParameters: payload.dtlsParameters });
-callback();
-      } catch (err: any) {
-        callback({ error: err.message });
+    try {
+      const room = await GetRoom(payload.roomId);
+      if (!room) {
+        return callback({ error: "Room not found" });
       }
-    }
+
+      const peer = room.peers.get(socket.id);
+      if (!peer) {
+        return callback({ error: "Peer not found" });
+      }
+
+      let transport: mediasoupTypes.WebRtcTransport | undefined;
+
+      if (payload.direction === "recv") {
+        transport = peer.consumerTransport.find(
+  (t: mediasoupTypes.WebRtcTransport) => t.id === payload.transportId
+);
+
+      } else {
+        transport = peer.producerTransport.find(
+  (t: mediasoupTypes.WebRtcTransport) => t.id === payload.transportId
+);
+
+      }
+
+      if (!transport) {
+        return callback({ error: "Transport not found" });
+      }
+
+      // 🔥 THIS LINE FIXES YOUR ERROR
+      const dtlsState = transport.dtlsState ?? "new";
+
+if (dtlsState !== "new") {
+  console.warn(
+    `⚠️ Transport ${transport.id} already connected (state=${dtlsState}), skipping`
   );
+  return callback();
+}
+
+
+      await transport.connect({
+        dtlsParameters: payload.dtlsParameters,
+      });
+
+      callback(); // ✅ exactly once
+    } catch (err: any) {
+      callback({ error: err.message });
+    }
+  }
+);
+
 
   socket.on(
   "produce",
