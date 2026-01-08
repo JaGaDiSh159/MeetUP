@@ -182,63 +182,88 @@ async function setup() {
   setConsumerTransport(recvTransport);
   console.log("📥 recvTransport CREATED", recvTransport.id);
 
-  // 4️⃣ CREATE SEND TRANSPORT
-  const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
-  if (!sendTransport) {
-    console.error("❌ Send transport not created");
-    return;
-  }
-  console.log("📤 sendTransport CREATED", sendTransport.id);
+// 4️⃣ CREATE SEND TRANSPORT
+const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
 
-  // 5️⃣ PRODUCE handler (ONCE)
-  sendTransport.on(
-    "produce",
-    async ({ kind, rtpParameters }, callback, errback) => {
-      socket.emit(
-        "produce",
-        {
-          roomId,
-          transportId: sendTransport.id,
-          kind,
-          rtpParameters,
-        },
-        (response: { id?: string; error?: string }) => {
-  const { id, error } = response;
-
-  if (error || !id) {
-    errback(new Error(error ?? "Produce failed"));
-  } else {
-    callback({ id });
-  }
+if (!sendTransport) {
+  console.error("❌ Send transport not created");
+  return;
 }
 
-      );
-    }
-  );
+console.log("📤 sendTransport CREATED", sendTransport.id);
 
-  // 6️⃣ CONNECT send transport
-  await new Promise<void>((resolve) => {
-    sendTransport.on("connect", (_params, callback) => {
-      callback();
-      resolve();
-    });
-  });
+// ✅ STEP 5 — CONNECT SEND TRANSPORT (CRITICAL FIX)
+sendTransport.on(
+  "connect",
+  ({ dtlsParameters }, callback, errback) => {
+    console.log("🔌 sendTransport connect event");
 
-  // 7️⃣ PRODUCE VIDEO
-  // 7️⃣ PRODUCE VIDEO
+    socket.emit(
+      "connectTransport",
+      {
+        roomId,
+        transportId: sendTransport.id,
+        direction: "send",
+        dtlsParameters,
+      },
+      (response: { error?: string }) => {
+        if (response?.error) {
+          console.error("❌ sendTransport connect failed", response.error);
+          errback(new Error(response.error));
+        } else {
+          console.log("✅ sendTransport connected");
+          callback();
+        }
+      }
+    );
+  }
+);
+
+// ✅ STEP 6 — PRODUCE HANDLER
+sendTransport.on(
+  "produce",
+  async ({ kind, rtpParameters }, callback, errback) => {
+    console.log("🎬 produce event fired:", kind);
+
+    socket.emit(
+      "produce",
+      {
+        roomId,
+        transportId: sendTransport.id,
+        kind,
+        rtpParameters,
+      },
+      ({ id, error }: { id?: string; error?: string }) => {
+        if (error || !id) {
+          console.error("❌ produce failed", error);
+          errback(new Error(error ?? "Produce failed"));
+        } else {
+          console.log("✅ producerId received:", id);
+          callback({ id });
+        }
+      }
+    );
+  }
+);
+
+// ✅ STEP 7 — PRODUCE VIDEO
 const videoTrack = stream.getVideoTracks()[0];
-if (!videoTrack) return;
+if (!videoTrack) {
+  console.error("❌ No video track");
+  return;
+}
 
 const videoProducer = await sendTransport.produce({ track: videoTrack });
 setProducer(videoProducer);
 console.log("🎥 Video produced:", videoProducer.id);
 
-// 🎤 PRODUCE AUDIO
+// ✅ STEP 8 — PRODUCE AUDIO
 const audioTrack = stream.getAudioTracks()[0];
 if (audioTrack) {
   await sendTransport.produce({ track: audioTrack });
   console.log("🎤 Audio produced");
 }
+
 
 }
 
