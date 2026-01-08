@@ -19,8 +19,11 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL,
+    origin: [
+      "https://meet-up-peach.vercel.app"
+    ],
     credentials: true,
+    methods: ["GET", "POST"]
   },
 });
 
@@ -30,9 +33,10 @@ const PORT = Number(process.env.PORT) || 5080;
 
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: "https://meet-up-peach.vercel.app",
   credentials: true
 }));
+
 
 
 app.use(express.json());
