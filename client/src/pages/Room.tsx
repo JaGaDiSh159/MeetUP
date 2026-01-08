@@ -10,6 +10,7 @@ import VideoCall from "../components/VideoCall";
 import { useNavigate } from "react-router-dom";
 import type { ConsumeResponse } from "../types";
 
+let setupInProgress = false;
 
 export default function Room() {
 
@@ -154,11 +155,10 @@ setRemoteStreams((prev) =>
         initialized.current = true;
 
 // 🔒 GLOBAL GUARD — VERY IMPORTANT
-let setupInProgress = false;
 
 async function setup() {
   if (setupInProgress) {
-    console.warn("⚠️ setup() already in progress, skipping");
+    console.warn("⚠️ setup() already running — skipping");
     return;
   }
 
@@ -166,20 +166,12 @@ async function setup() {
   console.log("🚀 setup() STARTED");
 
   try {
-    if (!roomId) {
-      console.warn("⚠️ No roomId, aborting setup");
-      return;
-    }
+    if (!roomId) return;
 
-    // 1️⃣ JOIN ROOM & LOAD DEVICE
     const joinedDevice = await joinRoom(roomId);
-    if (!joinedDevice) {
-      console.error("❌ Failed to join room");
-      return;
-    }
+    if (!joinedDevice) return;
     setDevice(joinedDevice);
 
-    // 2️⃣ GET USER MEDIA
     const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
       audio: true,
@@ -189,116 +181,66 @@ async function setup() {
       localVideoRef.current.srcObject = stream;
     }
 
-    // 3️⃣ CREATE RECV TRANSPORT FIRST
-    const recvTransport = await createRecTransport(
-      roomId,
-      "recv",
-      joinedDevice
-    );
-
-    if (!recvTransport) {
-      console.error("❌ recvTransport creation failed");
-      return;
-    }
-
+    const recvTransport = await createRecTransport(roomId, "recv", joinedDevice);
+    if (!recvTransport) return;
     setConsumerTransport(recvTransport);
-    console.log("📥 recvTransport CREATED", recvTransport.id);
 
-    // 4️⃣ CREATE SEND TRANSPORT
-    const sendTransport = await createSendTransport(
-      roomId,
-      "send",
-      joinedDevice
-    );
+    const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
+    if (!sendTransport) return;
 
-    if (!sendTransport) {
-      console.error("❌ sendTransport creation failed");
-      return;
-    }
+    sendTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
+      socket.emit(
+        "connectTransport",
+        {
+          roomId,
+          transportId: sendTransport.id,
+          direction: "send",
+          dtlsParameters,
+        },
+        (res: { error?: string }) => {
+  if (res?.error) errback(new Error(res.error));
+  else callback();
+}
 
-    console.log("📤 sendTransport CREATED", sendTransport.id);
-
-    // 5️⃣ CONNECT SEND TRANSPORT (DTLS)
-    sendTransport.on(
-      "connect",
-      ({ dtlsParameters }, callback, errback) => {
-        console.log("🔌 sendTransport connect event");
-
-        socket.emit(
-          "connectTransport",
-          {
-            roomId,
-            transportId: sendTransport.id,
-            direction: "send",
-            dtlsParameters,
-          },
-          (res: { error?: string }) => {
-            if (res?.error) {
-              console.error("❌ sendTransport connect failed", res.error);
-              errback(new Error(res.error));
-            } else {
-              console.log("✅ sendTransport connected");
-              callback(); // 🔴 MUST be called ONCE
-            }
-          }
-        );
-      }
-    );
-
-    // 6️⃣ PRODUCE HANDLER
-    sendTransport.on(
-      "produce",
-      ({ kind, rtpParameters }, callback, errback) => {
-        console.log("🎬 produce event fired:", kind);
-
-        socket.emit(
-          "produce",
-          {
-            roomId,
-            transportId: sendTransport.id,
-            kind,
-            rtpParameters,
-          },
-          ({ id, error }: { id?: string; error?: string }) => {
-            if (error || !id) {
-              console.error("❌ produce failed", error);
-              errback(new Error(error ?? "Produce failed"));
-            } else {
-              console.log("✅ producerId received:", id);
-              callback({ id }); // 🔴 EXACTLY ONCE
-            }
-          }
-        );
-      }
-    );
-
-    // 7️⃣ PRODUCE VIDEO
-    const videoTrack = stream.getVideoTracks()[0];
-    if (!videoTrack) {
-      console.error("❌ No video track found");
-      return;
-    }
-
-    const videoProducer = await sendTransport.produce({
-      track: videoTrack,
+      );
     });
 
-    setProducer(videoProducer);
-    console.log("🎥 Video produced:", videoProducer.id);
+    sendTransport.on("produce", ({ kind, rtpParameters }, callback, errback) => {
+      socket.emit(
+        "produce",
+        {
+          roomId,
+          transportId: sendTransport.id,
+          kind,
+          rtpParameters,
+        },
+        ({ id, error }: { id?: string; error?: string }) => {
+  if (error || !id) errback(new Error(error ?? "Produce failed"));
+  else callback({ id });
+}
 
-    // 8️⃣ PRODUCE AUDIO (OPTIONAL)
+      );
+    });
+
+    const videoTrack = stream.getVideoTracks()[0];
+    if (videoTrack) {
+      await sendTransport.produce({ track: videoTrack });
+    }
+
     const audioTrack = stream.getAudioTracks()[0];
     if (audioTrack) {
       await sendTransport.produce({ track: audioTrack });
-      console.log("🎤 Audio produced");
     }
 
-    console.log("✅ setup() COMPLETED SUCCESSFULLY");
+    console.log("✅ setup() COMPLETED");
   } catch (err) {
     console.error("❌ setup() FAILED", err);
-    setupInProgress = false; // allow retry on failure
+  } finally {
+    // 🔥 THIS IS CRITICAL
+    setupInProgress = false;
   }
 }
+
 
 
 
