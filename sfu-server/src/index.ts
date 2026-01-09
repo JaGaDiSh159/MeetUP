@@ -83,6 +83,38 @@ io.on("connection", (socket) => {
   );
 
   socket.on(
+  "resumeConsumer",
+  async (
+    payload: {
+      roomId: string;
+      consumerId: string;
+    }
+  ) => {
+    try {
+      const room = await GetRoom(payload.roomId);
+      if (!room) return;
+
+      const peer = room.peers.get(socket.id);
+      if (!peer) return;
+
+      const entry = peer.consumers.find(
+  ({ consumer }: { consumer: mediasoupTypes.Consumer }) =>
+    consumer.id === payload.consumerId
+);
+
+
+      if (!entry) return;
+
+      await entry.consumer.resume();
+    } catch (err) {
+      console.error("resumeConsumer error:", err);
+    }
+  }
+);
+
+
+
+  socket.on(
     "createWebRtcTransport",
     async (
       payload: { direction: "send" | "recv"; roomId: string },
@@ -376,7 +408,7 @@ if (dtlsState !== "new") {
         rtpCapabilities: payload.rtpCapabilities,
       });
 
-      await consumer.resume();
+      // await consumer.resume();
 
       peer.consumers.push({ consumer, transportId: transport.id });
 

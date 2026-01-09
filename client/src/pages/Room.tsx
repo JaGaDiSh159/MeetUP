@@ -100,7 +100,7 @@ consumedProducersRef.current.add(producerId);
                     rtpParameters,
                 });
 
-                newConsumer.resume();
+                // newConsumer.resume();
 
                 const remoteStream = new MediaStream();
                 remoteStream.addTrack(newConsumer.track);
