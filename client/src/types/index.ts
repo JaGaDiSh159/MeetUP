@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { types as mediasoupTypes } from "mediasoup-client"
+// import { types as mediasoupTypes } from "mediasoup-client"
 
 export type RemoteStream = {
     producerId: string;
@@ -20,12 +20,16 @@ export type VideoCallProps = {
 };
 
 
-export type ConsumeResponse = {
-    id: string;
-    kind: mediasoupTypes.MediaKind;
-    rtpParameters: mediasoupTypes.RtpParameters;
-    error?: string;
-};
+export interface ConsumeResponse {
+  id: string;
+  producerId: string;
+  kind: "audio" | "video";
+  rtpParameters: any;
+  type: "simple" | "simulcast" | "svc";
+  producerPaused: boolean;
+  error?: string;
+}
+
 
 export type ParticipantView = {
     id: string;
