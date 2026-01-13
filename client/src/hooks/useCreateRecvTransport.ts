@@ -1,4 +1,3 @@
-import socket from '../lib/socket';
 import { createTransport } from './createTransport';
 import { types as mediasoupTypes } from "mediasoup-client";
 
@@ -18,33 +17,14 @@ export const useCreateRecvTransport = () => {
         if (!device) {
             console.log("Device not found");
             return
-
         }
 
         const recvTransport = device.createRecvTransport(response);
-        console.log(recvTransport);
+        console.log("📥 Created recv transport:", recvTransport.id);
 
-        recvTransport.on(
-            "connect",
-            ({ dtlsParameters }, callback, errback) => {
-                socket.emit(
-                    "connectTransport",
-                    {
-                        roomId: roomId,
-                        transportId: recvTransport.id,
-                        direction: "recv",
-                        dtlsParameters,
-                    },
-                    (res: { error?: string }) => {
-                        if (res?.error) {
-                            errback(new Error(res.error));
-                            return;
-                        }
-                        callback();
-                    }
-                );
-            }
-        );
+        // 🔥 REMOVED: Don't attach connect handler here
+        // The connect handler will be attached in Room.tsx to avoid duplicates
+        // This prevents the race condition where connect() is called multiple times
 
         return recvTransport;
     };
