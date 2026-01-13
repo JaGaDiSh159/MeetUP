@@ -40,7 +40,6 @@ export default function Room() {
   const pendingProducersRef = useRef<Set<string>>(new Set());
   const consumedProducersRef = useRef<Set<string>>(new Set());
 
-  // 🔥 NEW: Track send transport to prevent duplicate connect handlers
   const sendTransportRef = useRef<mediasoupTypes.Transport | null>(null);
   const recvTransportRef = useRef<mediasoupTypes.Transport | null>(null);
 
@@ -79,7 +78,7 @@ export default function Room() {
       async (consumeResponse: ConsumeResponse) => {
         if (consumeResponse.error) {
           console.error("Consume error:", consumeResponse.error);
-          consumedProducersRef.current.delete(producerId); // 🔥 Allow retry
+          consumedProducersRef.current.delete(producerId);
           return;
         }
 
@@ -115,7 +114,7 @@ export default function Room() {
           console.log("✅ Consumed stream from producer:", producerId);
         } catch (err) {
           console.error("❌ Failed to consume:", err);
-          consumedProducersRef.current.delete(producerId); // 🔥 Allow retry
+          consumedProducersRef.current.delete(producerId);
         }
       }
     );
@@ -160,7 +159,6 @@ export default function Room() {
       return;
     }
 
-    // 🔥 FIX: Better setup guard - prevent both in-progress and completed re-runs
     if (setupInProgressRef.current || setupCompletedRef.current) {
       console.warn("⚠️ setup() already running or completed – skipping");
       return;
@@ -186,12 +184,12 @@ export default function Room() {
           localVideoRef.current.srcObject = stream;
         }
 
-        // 🔥 FIX: Create recv transport first and store reference
+        // Create recv transport
         const recvTransport = await createRecTransport(roomId, "recv", joinedDevice);
         if (!recvTransport) return;
         
-        // 🔥 Only attach connect handler if not already attached
-        if (!recvTransportRef.current && recvTransport.listenerCount('connect') === 0) {
+        // Attach connect handler
+        if (recvTransport.listenerCount('connect') === 0) {
           recvTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
             console.log("🔗 Recv transport connect event");
             socket.emit(
@@ -218,12 +216,12 @@ export default function Room() {
         recvTransportRef.current = recvTransport;
         setConsumerTransport(recvTransport);
 
-        // 🔥 FIX: Create send transport and store reference
+        // Create send transport
         const sendTransport = await createSendTransport(roomId, "send", joinedDevice);
         if (!sendTransport) return;
 
-        // 🔥 Only attach handlers if not already attached
-        if (!sendTransportRef.current && sendTransport.listenerCount('connect') === 0) {
+        // Attach handlers
+        if (sendTransport.listenerCount('connect') === 0) {
           sendTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
             console.log("🔗 Send transport connect event");
             socket.emit(
@@ -271,6 +269,7 @@ export default function Room() {
         
         sendTransportRef.current = sendTransport;
 
+        // Produce tracks
         const videoTrack = stream.getVideoTracks()[0];
         if (videoTrack) {
           await sendTransport.produce({ track: videoTrack });
@@ -282,19 +281,21 @@ export default function Room() {
         }
 
         console.log("✅ setup() COMPLETED");
-        setupCompletedRef.current = true; // 🔥 Mark as completed
+        setupCompletedRef.current = true;
       } catch (err) {
         console.error("❌ setup() FAILED", err);
-        setupInProgressRef.current = false; // 🔥 Reset on error to allow retry
+        setupInProgressRef.current = false;
       }
     }
 
     setup();
 
-    // 🔥 Cleanup function
+    // 🔥 CRITICAL: Empty cleanup - don't do anything on unmount during setup
     return () => {
-      console.log("🧹 Cleaning up Room component");
-      // Don't reset setupInProgressRef here - let it stay true to prevent re-runs
+      // Only log, don't actually clean anything up during development re-renders
+      if (!setupCompletedRef.current) {
+        console.log("🧹 Component unmounting during setup - ignoring");
+      }
     };
   }, [roomId, joinRoom, createSendTransport, createRecTransport]);
 
@@ -303,7 +304,6 @@ export default function Room() {
 
     console.log("✅ Consumer transport ready, fetching producers");
 
-    // 1️⃣ Consume producers already in room
     socket.emit(
       "getProducers",
       roomId,
@@ -315,7 +315,6 @@ export default function Room() {
       }
     );
 
-    // 2️⃣ Flush buffered producers (from early newProducer events)
     pendingProducersRef.current.forEach((producerId) => {
       console.log("🔄 Flushing buffered producer:", producerId);
       consumeRef.current?.(producerId);
@@ -328,7 +327,6 @@ export default function Room() {
     consumedProducersRef.current.clear();
     pendingProducersRef.current.clear();
 
-    // 🔥 Close transports properly
     if (sendTransportRef.current && !sendTransportRef.current.closed) {
       sendTransportRef.current.close();
     }
@@ -337,7 +335,6 @@ export default function Room() {
     }
 
     socket.disconnect();
-
     navigate("/");
   };
 
