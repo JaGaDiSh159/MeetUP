@@ -152,6 +152,7 @@ export default function Room() {
   }, []);
 
   const setupInProgressRef = useRef(false);
+  const setupCompletedRef = useRef(false);
 
   useEffect(() => {
     if (!roomId) {
@@ -159,9 +160,9 @@ export default function Room() {
       return;
     }
 
-    // 🔥 FIX: Better setup guard
-    if (setupInProgressRef.current) {
-      console.warn("⚠️ setup() already running – skipping");
+    // 🔥 FIX: Better setup guard - prevent both in-progress and completed re-runs
+    if (setupInProgressRef.current || setupCompletedRef.current) {
+      console.warn("⚠️ setup() already running or completed – skipping");
       return;
     }
 
@@ -190,7 +191,7 @@ export default function Room() {
         if (!recvTransport) return;
         
         // 🔥 Only attach connect handler if not already attached
-        if (!recvTransportRef.current) {
+        if (!recvTransportRef.current && recvTransport.listenerCount('connect') === 0) {
           recvTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
             console.log("🔗 Recv transport connect event");
             socket.emit(
@@ -222,7 +223,7 @@ export default function Room() {
         if (!sendTransport) return;
 
         // 🔥 Only attach handlers if not already attached
-        if (!sendTransportRef.current) {
+        if (!sendTransportRef.current && sendTransport.listenerCount('connect') === 0) {
           sendTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
             console.log("🔗 Send transport connect event");
             socket.emit(
@@ -281,9 +282,10 @@ export default function Room() {
         }
 
         console.log("✅ setup() COMPLETED");
+        setupCompletedRef.current = true; // 🔥 Mark as completed
       } catch (err) {
         console.error("❌ setup() FAILED", err);
-        setupInProgressRef.current = false; // 🔥 Reset on error
+        setupInProgressRef.current = false; // 🔥 Reset on error to allow retry
       }
     }
 

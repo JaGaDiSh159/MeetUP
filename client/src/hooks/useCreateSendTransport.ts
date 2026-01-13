@@ -1,7 +1,5 @@
-import socket from '../lib/socket';
 import { createTransport } from './createTransport';
 import { types as mediasoupTypes } from "mediasoup-client";
-
 
 type TransportResponse = {
     id: string;
@@ -12,8 +10,6 @@ type TransportResponse = {
 
 export const useCreateSendTransport = () => {
 
-
-
     async function createSendTransport(roomId: string, direction: "send" | "recv", device: mediasoupTypes.Device) {
 
         const response: TransportResponse = await createTransport(roomId, direction)
@@ -23,59 +19,15 @@ export const useCreateSendTransport = () => {
             return;
         }
 
-        console.log(response);
+        console.log("📤 Creating send transport:", response.id);
 
         const sendTransport = device.createSendTransport(response);
 
-        sendTransport.on(
-            "connect",
-            ({ dtlsParameters }, callback, errback) => {
-                socket.emit(
-                    "connectTransport",
-                    {
-                        roomId: roomId,
-                        transportId: sendTransport.id,
-                        direction: "send",
-                        dtlsParameters,
-                    },
+        // 🔥 REMOVED: Event handlers will be attached in Room.tsx
+        // This prevents duplicate handler registration
 
-                    (res: { error?: string }) => {
-                        if (res?.error) {
-                            errback(new Error(res.error));
-                            return;
-                        }
-                        callback();
-                    }
-                );
-            }
-        );
-
-        sendTransport.on(
-            "produce",
-            async ({ kind, rtpParameters }, callback, errback) => {
-                socket.emit(
-                    "produce",
-                    {
-                        roomId: roomId,
-                        transportId: sendTransport.id,
-                        kind,
-                        rtpParameters,
-                    },
-                    ({ id, error }: { id: string; error: string }) => {
-                        if (error) {
-                            errback(new Error(error));
-                            return;
-                        }
-                        callback({ id });
-                    }
-                );
-            }
-        );
-        return sendTransport
-
+        return sendTransport;
     }
 
     return { createSendTransport };
-
-
 };
