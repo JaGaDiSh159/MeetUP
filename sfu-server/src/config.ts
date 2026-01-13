@@ -14,8 +14,13 @@ export const mediaCodecs: mediasoupTypes.RtpCodecCapability[] = [
     clockRate: 90000,
     preferredPayloadType: undefined as any,
   },
+  {
+    kind: "video",
+    mimeType: "video/VP9",
+    clockRate: 90000,
+    preferredPayloadType: undefined as any,
+  },
 ];
-
 
 export const webRtcTransport_options: mediasoupTypes.WebRtcTransportOptions = {
   listenIps:
@@ -23,7 +28,8 @@ export const webRtcTransport_options: mediasoupTypes.WebRtcTransportOptions = {
       ? [
           {
             ip: "0.0.0.0",
-            announcedIp: process.env.WEBRTC_ANNOUNCED_IP!,
+            // 🔥 FIX: Use undefined to auto-detect IP (works with Render free tier!)
+            announcedIp: undefined,
           },
         ]
       : [
@@ -33,5 +39,5 @@ export const webRtcTransport_options: mediasoupTypes.WebRtcTransportOptions = {
         ],
   enableUdp: true,
   enableTcp: true,
-  preferUdp: true,
+  preferUdp: true, // Try UDP first, fallback to TCP if needed
 };
