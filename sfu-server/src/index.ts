@@ -261,15 +261,12 @@ io.on("connection", (socket) => {
         }
 
         // 🔥 THIS LINE FIXES YOUR ERROR
-        const dtlsState = transport.dtlsState ?? "new";
-
-        if (dtlsState !== "new") {
+        if (transport.dtlsState !== "new") {
           console.warn(
-            `⚠️ Transport ${transport.id} already connected (state=${dtlsState}), skipping`
+            `⚠️ Transport ${transport.id} already connected (state=${transport.dtlsState}), skipping`
           );
           return callback();
         }
-
 
         await transport.connect({
           dtlsParameters: payload.dtlsParameters,
@@ -494,5 +491,3 @@ io.on("connection", (socket) => {
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`SFU signaling server running on port ${PORT}`);
 });
-
-
